@@ -14,7 +14,7 @@ This is Converstion Piece
   #include <avr/power.h>
 #endif
 
-#define STRIPPIN 9
+#define STRIPPIN 10
 #define PIXELCOUNT 8
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(PIXELCOUNT, STRIPPIN, NEO_GRB + NEO_KHZ800);
 int stripBrightness = 0;
@@ -33,20 +33,110 @@ Adafruit_VS1053_FilePlayer musicPlayer =
   Adafruit_VS1053_FilePlayer(SHIELD_RESET, SHIELD_CS, SHIELD_DCS, DREQ, CARDCS);
 
 char * audioFiles[20] = {
+  "/audio/q-116.mp3",
+  "/audio/q-109.mp3",
+  "/audio/q-072.mp3",
+  "/audio/q-011.mp3",
+  "/audio/q-056.mp3",
+  "/audio/q-063.mp3",
+  "/audio/q-075.mp3",
+  "/audio/q-126.mp3",
+  "/audio/q-032.mp3",
+  "/audio/q-106.mp3",
+  "/audio/q-127.mp3",
+  "/audio/q-090.mp3",
+  "/audio/q-045.mp3",
+  "/audio/q-121.mp3",
+  "/audio/q-082.mp3",
+  "/audio/q-059.mp3",
+  "/audio/q-091.mp3",
+  "/audio/q-069.mp3",
+  "/audio/q-030.mp3",
+  "/audio/q-094.mp3",
+  "/audio/q-087.mp3",
+  "/audio/q-065.mp3",
+  "/audio/cuddlef.mp3",
+  "/audio/q-031.mp3",
+  "/audio/q-081.mp3",
+  "/audio/q-067.mp3",
+  "/audio/q-107.mp3",
+  "/audio/q-128.mp3",
+  "/audio/q-071.mp3",
+  "/audio/q-097.mp3",
+  "/audio/q-103.mp3",
+  "/audio/q-105.mp3",
+  "/audio/q-036.mp3",
+  "/audio/q-046.mp3",
+  "/audio/q-047.mp3",
+  "/audio/q-051.mp3",
+  "/audio/q-035.mp3",
+  "/audio/q-119.mp3",
+  "/audio/q-077.mp3",
+  "/audio/q-104.mp3",
+  "/audio/q-022.mp3",
+  "/audio/q-118.mp3",
+  "/audio/q-007.mp3",
+  "/audio/q-023.mp3",
+  "/audio/q-064.mp3",
+  "/audio/q-114.mp3",
+  "/audio/q-053.mp3",
+  "/audio/q-016.mp3",
+  "/audio/q-028.mp3",
+  "/audio/q-061.mp3",
+  "/audio/q-021.mp3",
   "/audio/track001.mp3",
-  "/audio/test002.mp3",
-  "/audio/test003.mp3",
+  "/audio/q-040.mp3",
+  "/audio/q-017.mp3",
+  "/audio/q-033.mp3",
+  "/audio/q-095.mp3",
+  "/audio/q-070.mp3",
+  "/audio/q-085.mp3",
+  "/audio/q-131.mp3",
+  "/audio/q-076.mp3",
+  "/audio/q-044.mp3",
+  "/audio/q-086.mp3",
+  "/audio/q-078.mp3",
+  "/audio/q-096.mp3",
+  "/audio/q-108.mp3",
+  "/audio/q-019.mp3",
+  "/audio/q-043.mp3",
+  "/audio/q-015.mp3",
+  "/audio/q-003.mp3",
+  "/audio/q-008.mp3",
+  "/audio/q-050.mp3",
+  "/audio/q-115.mp3",
+  "/audio/q-018.mp3",
+  "/audio/smuggle.mp3",
+  "/audio/q-073.mp3",
+  "/audio/q-083.mp3",
+  "/audio/q-054.mp3",
+  "/audio/q-066.mp3",
+  "/audio/namespo.mp3",
+  "/audio/q-084.mp3",
+  "/audio/q-041.mp3",
+  "/audio/evoluti.mp3",
+  "/audio/q-010.mp3",
+  "/audio/badthi.mp3",
+  "/audio/q-002.mp3",
+  "/audio/q-111.mp3",
+  "/audio/q-009.mp3",
+  "/audio/q-099.mp3",
 };
-const int audioFileCount = 3;
+const int audioFileCount = 139;
 int currentTrack = 0;
 
 //
-// Setup for button
+// Setup for buttons
 //
-const int buttonPin = 2;
-int buttonState = 0;
-int lastButtonState = 0;
-const int buttonLightPin = 8;
+const int playButtonPin = 2;
+int playButtonState = 0;
+int lastPlayButtonState = 0;
+const int playButtonLightPin = 8;
+
+const int replayButtonPin = 5;
+int replayButtonState = 0;
+int lastReplayButtonState = 0;
+const int replayButtonLightPin = 9;
 
 //
 // Photocell
@@ -55,8 +145,10 @@ const int photocellPin = 0; // analog 0
 int photocellReading;
 
 void setup() {
-  pinMode(buttonPin, INPUT);
-  pinMode(buttonLightPin, OUTPUT);
+  pinMode(photocellPin, INPUT);
+  pinMode(playButtonPin, INPUT);
+  pinMode(playButtonLightPin, OUTPUT);
+  pinMode(replayButtonLightPin, OUTPUT);
 
   Serial.begin(9600);
 
@@ -69,7 +161,7 @@ void setup() {
   Serial.println(F("VS1053 found"));
 
   // turn the button light on
-  turnButtonLightOn();
+  turnButtonLightsOn();
 
   SD.begin(CARDCS);    // initialise the SD card
 
@@ -101,41 +193,64 @@ void checkPhotocellState() {
   // Serial.println(photocellReading);
 }
 
-void checkButtonState() {
+void checkReplayButtonState() {
 
-  buttonState = digitalRead(buttonPin);
+  replayButtonState = digitalRead(replayButtonPin);
+  Serial.println(replayButtonState);
 
-  if ( buttonState != lastButtonState ) {
-    if ( buttonState ) {
+  if ( replayButtonState != lastReplayButtonState ) {
+    if ( replayButtonState ) {
       Serial.println("pushed");
-      playRandomFile();
+      playCurrentFile();
     }
     delay(50);
   }
 
-  lastButtonState = buttonState;
+  lastReplayButtonState = replayButtonState;
 }
 
-void playRandomFile() {
+void checkPlayButtonState() {
 
-  turnButtonLightOff();
-  musicPlayer.playFullFile(audioFiles[currentTrack]);
-  turnButtonLightOn();
+  playButtonState = digitalRead(playButtonPin);
+  // Serial.println(playButtonState);
+
+  if ( playButtonState != lastPlayButtonState ) {
+    if ( playButtonState ) {
+      Serial.println("pushed");
+      playNextFile();
+    }
+    delay(50);
+  }
+
+  lastPlayButtonState = playButtonState;
+}
+
+void playNextFile() {
 
   currentTrack++;
   if ( currentTrack >= audioFileCount ) {
     currentTrack = 0;
   }
 
+  playCurrentFile();
+
 }
 
-void turnButtonLightOn() {
-  digitalWrite(buttonLightPin, HIGH);
+void playCurrentFile() {
+  turnButtonLightsOff();
+  musicPlayer.playFullFile(audioFiles[currentTrack]);
+  turnButtonLightsOn();
+}
+
+void turnButtonLightsOn() {
+  digitalWrite(playButtonLightPin, HIGH);
+  digitalWrite(replayButtonLightPin, HIGH);
   Serial.println("button light ON");
 }
 
-void turnButtonLightOff() {
-  digitalWrite(buttonLightPin, LOW);
+void turnButtonLightsOff() {
+  digitalWrite(playButtonLightPin, LOW);
+  digitalWrite(replayButtonLightPin, LOW);
   Serial.println("button light OFF");
 }
 
@@ -145,13 +260,40 @@ void turnButtonLightOff() {
 
 void loop() {
 
-  checkButtonState();
+  checkPlayButtonState();
+
+  checkReplayButtonState();
 
   checkPhotocellState();
 
+//  rainbowCycle(50);
+
 }
 
+void rainbow(uint8_t wait) {
+  uint16_t i, j;
 
+  for(j=0; j<256; j++) {
+    for(i=0; i<strip.numPixels(); i++) {
+      strip.setPixelColor(i, Wheel((i+j) & 255));
+    }
+    strip.show();
+    delay(wait);
+  }
+}
+
+// Slightly different, this makes the rainbow equally distributed throughout
+void rainbowCycle(uint8_t wait) {
+  uint16_t i, j;
+
+  for(j=0; j<256 * 5; j++) { // 5 cycles of all colors on wheel
+    for(i=0; i< strip.numPixels(); i++) {
+      strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
+    }
+    strip.show();
+    delay(wait);
+  }
+}
 
 
 
